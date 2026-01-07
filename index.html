@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Space Canvas</title>
+  <style>
+    :root {
+      --color-bg: #e1e7ef;
+      --color-white: #fff;
+      --color-border: #ddd;
+      --color-border-light: #ccc;
+      --color-shadow: rgba(0, 0, 0, 0.1);
+      --color-shadow-strong: rgba(0, 0, 0, 0.15);
+      --color-shadow-sidebar: rgba(0, 0, 0, 0.2);
+      --color-shadow-card: rgba(0,0,0,0.07);
+      --color-placeholder: #e9e9e9;
+      --color-text: #222;
+      --color-text-light: #666;
+      --color-link: #7a8a99;
+      --color-overlay: rgba(0, 0, 0, 0.3);
+      --color-ui-bg: rgba(255,255,255,0.9);
+      --font-main: system-ui, sans-serif;
+      --font-size-base: 1rem;
+      --font-size-small: 0.9rem;
+      --font-size-xsmall: 0.85rem;
+      --radius-small: 4px;
+      --radius-medium: 6px;
+      --radius-large: 8px;
+      --radius-xlarge: 16px;
+      --padding-base: 8px;
+      --padding-small: 4px;
+      --padding-large: 12px;
+      --sidebar-width: 640px;
+      --logo-size: 24px;
+      --transition-fast: 0.25s;
+      --shadow-node: 0 4px 12px rgba(0, 0, 0, 0.08);
+      --shadow-default: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    }
+
+    /* Layout & Base */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font-main);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-bg);
+    }
+    #app {
+      height: 100%;
+      width: 100%;
+    }
+
+    /* Canvas */
+    .canvas-wrapper {
+      position: relative;
+      height: 100%;
+      width: 100%;
+      background: var(--color-bg);
+      cursor: grab;
+    }
+    .canvas-content {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: translate(var(--tx, 0), var(--ty, 0)) scale(var(--scale, 1));
+      transform-origin: 0 0;
+    }
+
+    /* Nodes */
+    .node {
+      position: absolute;
+      box-sizing: border-box;
+    }
+    .text-node {
+      background: var(--color-white);
+      padding: var(--padding-base) calc(var(--padding-base) * 1.5);
+      border-radius: 999px;
+      max-width: 200px;
+      min-width: 120px;
+      font-size: var(--font-size-base);
+      box-shadow: var(--shadow-default);
+      display: flex;
+      align-items: center;
+    }
+    .text-node span {
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: inline-block;
+      flex: 1 1 0%;
+    }
+    .text-node svg {
+      flex-shrink: 0;
+    }
+    .text-node:hover {
+      cursor: pointer;
+    }
+    .image-node {
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+    }
+    .image-node img {
+      display: block;
+      max-width: 100%;
+      border-radius: 0;
+    }
+    .iframe-placeholder {
+      width: 200px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--font-size-small);
+      color: var(--color-text-light);
+      background: var(--color-placeholder);
+      border-radius: var(--radius-medium);
+    }
+    .weblink-node {
+      width: 240px;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      border-radius: var(--radius-large);
+      box-shadow: var(--shadow-default);
+      background: var(--color-white);
+      border: 1px solid #EFEFEF;
+      text-decoration: none;
+      color: inherit;
+      overflow: hidden;
+      position: absolute;
+      box-sizing: border-box;
+      font-family: var(--font-main);
+    }
+    .weblink-node img.preview {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: var(--radius-large) var(--radius-large) 0 0;
+      display: block;
+    }
+    .weblink-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 12px 16px 14px 16px;
+      background: transparent;
+    }
+    .weblink-title {
+      font-weight: 600;
+      font-size: 1rem;
+      line-height: 1.2;
+      margin-bottom: 8px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-height: 2.4em;
+    }
+    .weblink-domain {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      color: var(--color-link);
+      font-weight: 500;
+    }
+    .weblink-favicon {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      background: #f7f9fb;
+      flex-shrink: 0;
+    }
+    .inline-text-node {
+      background: var(--color-white);
+      border-radius: var(--radius-medium);
+      padding: var(--padding-base) calc(var(--padding-base) * 1.5);
+      font-size: var(--font-size-base);
+      min-width: 120px;
+      max-width: 200px;
+      box-shadow: var(--shadow-default);
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .iframe-node {
+      box-shadow: var(--shadow-default);
+      overflow: hidden;
+    }
+
+    /* Connections */
+    svg.connections {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* UI Layer */
+    .ui-layer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 100;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: max-content auto;
+      gap: 8px;
+      padding: var(--padding-base) var(--padding-large);
+    }
+    .title-btn {
+      background: none;
+      border: none;
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: var(--padding-small) var(--padding-base);
+      pointer-events: auto;
+    }
+    .logo {
+      width: var(--logo-size);
+      height: var(--logo-size);
+      pointer-events: auto;
+    }
+
+    /* Space Dialog */
+    .space-dialog-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+    }
+    .space-dialog {
+      position: absolute;
+      top: 42px;
+      left: 12px;
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-large);
+      padding: var(--padding-large);
+      min-width: 240px;
+      box-shadow: 0 4px 8px var(--color-shadow-strong);
+    }
+
+    /* Sidebar */
+    .sidebar-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--color-overlay);
+      z-index: 190;
+    }
+    .sidebar {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: var(--sidebar-width);
+      min-height: calc(100vh - 16px);
+      max-height: calc(100vh - 16px);
+      height: auto;
+      background: var(--color-white);
+      box-shadow: var(--shadow-default);
+      padding: 16px;
+      overflow-y: auto;
+      animation: slide-in var(--transition-fast) ease-out;
+      border-radius: 16px;
+      z-index: 200;
+    }
+    @keyframes slide-in {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    .close-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    .tiptap-weblink {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fafbfc;
+      padding: 16px 18px 14px 18px;
+      margin: 14px 0;
+      display: block;
+      max-width: 520px;
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow 0.15s;
+    }
+    .tiptap-weblink-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .tiptap-weblink-description {
+      font-size: 1rem;
+      color: #444;
+      margin-bottom: 10px;
+    }
+    .tiptap-weblink-url {
+      font-size: 0.98rem;
+      color: #7a8a99;
+      font-weight: 400;
+      margin-top: 2px;
+      word-break: break-all;
+    }
+    .tiptap-image {
+      display: block;
+      max-width: 100%;
+      margin: 18px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .empty-note-helper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 120px;
+      color: #888;
+      font-size: 1.1em;
+    }
+    .ui-logo-box {
+      width: 56px;
+      height: 56px;
+      background: #fff;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-default);
+      flex-shrink: 0;
+    }
+    .ui-logo {
+      width: 32px;
+      height: 32px;
+      display: block;
+    }
+    .ui-info-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: var(--shadow-default);
+      padding: 28px 36px 28px 32px;
+      min-width: 340px;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      align-items: flex-start;
+    }
+    .ui-info-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .ui-username {
+      font-size: 1.15rem;
+      color: #666;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+    .ui-space-title {
+      font-size: 1.45rem;
+      font-weight: 600;
+      color: #333;
+      margin-top: 8px;
+      margin-bottom: 0;
+    }
+    .ui-space-desc {
+      font-size: 1.15rem;
+      color: #444;
+      margin-top: 8px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script id="space-data" type="application/json">{"id":"d7af453c-cf4a-11ef-b265-471e01152f75","updated":"2025-02-07T06:56:37Z","title":"bunny","description":"","owner":{"id":"ffc76140-cf49-11ef-a016-77eacb19f3ba","profilePictureUrl":"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/1e3495fe-655f-4f0c-123f-f181fdef9200/avatar","username":"redmah"},"nodes":[{"id":"19a23b29-ecda-4959-8ac9-694256c93273","title":"","type":"IframeEmbed","xCoord":1180.0588162042807,"yCoord":62.344335251573554,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":0,"url":"https://open.spotify.com/playlist/426lsMwBYiZ8u3469x40Ne?si=2f85fa99e0644635"},{"id":"2e68f6b9-e37b-4171-9815-bfc37887fb88","title":"picrew","type":"Text","xCoord":930.2910855891348,"yCoord":278.41170509284024,"outgoingLinks":[],"incomingLinks":[],"childBlocks":[{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/2493d5fe-0644-448a-f388-920fa56ca300/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/3aa6e6a2-db25-4a52-f384-0b18b5023000/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/c946cf2f-d168-46aa-cb78-1c28fbf59c00/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"       (sim, eu sei que vc nunca colocaria esses posters mas são os únicos que tinham....e são os que eu colocaria, beijos)\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/2c0b263c-1a39-45ad-a852-d1c73f859000/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"mano acho que nunca fiz um tão parecido com vc como esse, só mudaria a cor do cabelo, o comprimento, deixaria o rosto mais fino e pronto)\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/33ed8e75-a6e5-4231-be5c-efbcbc61fc00/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"                                      \\\"mas que porra de bicho é esse?\\\" não me pergunte\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/557ab99e-e61c-4f98-4b84-545e4b393100/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"        (eu ia falar que somos nós e a érica é essa porra feia verde mas o boneco do teu lado se                        ficar mais claro e tirar os óculos é literalmente a érica, por isso vc que escolhe)\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/fc2eac4e-2b7a-4903-4798-289f6b542300/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"                          osvaldo, érica e eu estamos na imagem, muito difícil saber quem é quem\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/47298eb0-3493-4b5c-4c50-c091b2a02e00/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/5da31967-2ec5-4731-969a-1cc307f75700/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/4868fc10-01f7-4972-d4b2-60bb6a910600/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"                                          \\\"ah mas pq as orelhas tão assim?\\\" achei bonito\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/b5459646-8be8-477d-aa74-d59c591f9300/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"                             se não gostou de vc segurando o sorvete finge que é uma pica\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/8c1bead1-bf36-4721-0fc9-d5c9498df000/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"                                                             EU AMEI ESSA MERDA\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/e0e4a990-a0a1-4c8e-31fe-cfb1720a1800/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/f863719f-b91d-4814-fa79-b1a892cc5d00/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0}],"order":224,"content":"{\"content\":[{\"attrs\":{\"id\":\"40cd32cd-8610-44b0-b4d5-a5fd95a83f56\"},\"type\":\"paragraph\"},{\"attrs\":{\"alt\":null,\"id\":\"336e7978-c8e4-427c-a2d2-8675b39203d6\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"alt\":null,\"id\":\"9a83af5e-c911-452d-b1f3-f86f6b38a724\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"alt\":null,\"id\":\"d459a750-05a2-44ca-8bf2-50b0db6a896a\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"id\":\"f4d87df2-53b2-4a19-b4b6-7edfff8d1b9c\"},\"content\":[{\"text\":\"       (sim, eu sei que vc nunca colocaria esses posters mas são os únicos que tinham....e são os que eu colocaria, beijos)\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"alt\":null,\"id\":\"bbc5ec55-ed9e-4c15-a809-22326ff69045\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"id\":\"23e229ea-377a-4ab8-b723-61b6266f0906\"},\"content\":[{\"text\":\"mano acho que nunca fiz um tão parecido com vc como esse, só mudaria a cor do cabelo, o comprimento, deixaria o rosto mais fino e pronto)\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"alt\":null,\"id\":\"f6915f93-7395-4909-b136-b1b824efc9d8\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"id\":\"625d4d9c-f6f7-4b5e-ba67-0b21035c08ab\"},\"content\":[{\"text\":\"                                      \\\"mas que porra de bicho é esse?\\\" não me pergunte\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"alt\":null,\"id\":\"92ba7f1b-9731-4545-8e8b-adf10feee4ed\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"id\":\"8d1f7db5-84ea-419e-b614-8f4deecf234f\"},\"content\":[{\"text\":\"        (eu ia falar que somos nós e a érica é essa porra feia verde mas o boneco do teu lado se                        ficar mais claro e tirar os óculos é literalmente a érica, por isso vc que escolhe)\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"alt\":null,\"id\":\"8cc71e63-e56e-4727-b8f7-0b1457900978\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"id\":\"009ae260-a44a-4ce2-bc4d-f0f791b64011\"},\"content\":[{\"text\":\"                          osvaldo, érica e eu estamos na imagem, muito difícil saber quem é quem\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"alt\":null,\"id\":\"7b83b56c-d525-4f3b-83a5-dc128fc7e22b\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"alt\":null,\"id\":\"ea521ed0-f199-411b-b31e-f23668fd8e6d\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"alt\":null,\"id\":\"0fe06914-5f7f-44e1-8662-96900c977db1\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"id\":\"815e08c1-8575-42a1-a0c5-e77aba577a20\"},\"content\":[{\"text\":\"                                          \\\"ah mas pq as orelhas tão assim?\\\" achei bonito\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"alt\":null,\"id\":\"e4347b5a-1da4-4508-8ac7-bfde9296a1b1\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"id\":\"e1ce6e0e-76b7-4057-9614-7a0eb780903a\"},\"content\":[{\"text\":\"                             se não gostou de vc segurando o sorvete finge que é uma pica\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"alt\":null,\"id\":\"a8c2f0cf-b3c7-4fcc-bf88-072ff06a6809\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"id\":\"16dee570-7f21-4faf-951c-b5827c82e8dc\"},\"content\":[{\"text\":\"                                                             EU AMEI ESSA MERDA\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"alt\":null,\"id\":\"1a6fa691-c6bf-451e-b65f-0a94e1bc32ce\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"alt\":null,\"id\":\"5bfe3435-e411-45ca-9f86-fdcde418a299\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"id\":\"c477ea6d-896f-4603-96dd-cc0809c74ab8\"},\"type\":\"paragraph\"},{\"attrs\":{\"alt\":null,\"id\":\"36099577-48f3-4cf8-864d-ce4d08bab9a2\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"id\":\"c1618fc1-e0aa-4ee7-84d9-b510d16685be\"},\"type\":\"paragraph\"},{\"attrs\":{\"alt\":null,\"id\":\"188a9fed-59f0-4d75-9339-3c91609ecb0a\",\"src\":\"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp\",\"title\":null},\"type\":\"image\"},{\"attrs\":{\"id\":\"edd5b85f-97f9-4bb0-bf3e-dac8dcf62f6f\"},\"type\":\"paragraph\"}],\"type\":\"doc\"}","url":"assets/2e68f6b9-e37b-4171-9815-bfc37887fb88.webp"},{"id":"1ca78d98-9d18-4cac-b8db-2880cef43871","title":"","type":"WebLink","xCoord":854.2424271110593,"yCoord":366.50820888576476,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":14,"url":"https://drive.google.com/file/d/1JisgSNT_aNZ0vljL397H8GcI1k6V16M1/view?usp=sharing","_openGraph":{"description":"Web word processing, presentations and spreadsheets","faviconUrl":"","previewImageFileKey":"","title":"Page Not Found","url":""}},{"id":"ee9b9334-887e-465e-9971-86f5d40eadbc","title":"","type":"InlineText","xCoord":566.9332977710459,"yCoord":283.9957071221952,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":12,"content":"       relaxa bruna, não é virus\n(aumenta a qualidade antes de ver)"},{"id":"92ce2c61-1b92-43cd-b8ad-48d42ba17e1e","title":"lalalala","type":"Text","xCoord":1604.2005157275107,"yCoord":57.421967585952075,"outgoingLinks":[],"incomingLinks":[],"childBlocks":[{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"eu preciso ocupar espaço nessa coisa por isso vou anexar uma merdinha que acho que vc tem direito de ler, de preferência vamos fingir que vc nunca leu isso, e que eu nunca mandei, não me mata, te amo\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"se vira pra ler lindeza, não consigo aumentar essa porra (tenta aumentar pelo coiso de dar zoom do próprio google)\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"lendo essa merda de novo da até vergonha alheia mas pelo menos eu tentei escrever correto......\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/58dca4ba-9827-4f82-3cae-1ef81afeeb00/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/0e4bacff-3f2b-46e4-9d21-f485a331be00/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/eb664bb6-240d-4820-887b-79eb73db9c00/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/7f9afc04-92d8-4720-9547-2bbc54217600/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"                          pronto agora finge que tem \", \"type\": \"text\", \"styles\": {}}, {\"text\": \"amnésia, você não leu isso, é tudo ilusão\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0}],"order":162,"url":"assets/92ce2c61-1b92-43cd-b8ad-48d42ba17e1e.webp"},{"id":"63eee945-9eee-4958-b61c-25eec4bf9833","title":"filmes/séries","type":"Text","xCoord":945.9519320509936,"yCoord":520.6238308577731,"outgoingLinks":[],"incomingLinks":[],"childBlocks":[{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"eu sei que vc nunca vai assistir mas vou fazer isso mesmo assim\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"young hearts\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"url\": \"https://drive.google.com/file/d/14GdjuPodgH5q8fxmYpsrMVGkUr_0tbpX/view?usp=sharing\", \"type\": \"weblink\", \"title\": \"\", \"faviconUrl\": \"\", \"description\": \"\", \"previewImageFileKey\": \"\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"look back\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"url\": \"https://drive.google.com/file/d/143SDnXKvNiX4PI0U3iykzpWC2CFD2nQO/view?usp=sharing\", \"type\": \"weblink\", \"title\": \"LOOK BACK LEG (t.me/driveprime).mp4\", \"faviconUrl\": \"https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png\", \"description\": \"\", \"previewImageFileKey\": \"\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"doukyuusei (anime de bichas)\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"url\": \"https://drive.google.com/file/d/1cBs7Gz3pt-1CSfsf8ZAbGCF77Ps3r60J/view?usp=sharing\", \"type\": \"weblink\", \"title\": \"[Peak Spider Fansub]Doukyuusei.mp4\", \"faviconUrl\": \"https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png\", \"description\": \"\", \"previewImageFileKey\": \"\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"saving face (filme de lésbicas)\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"url\": \"https://drive.google.com/file/d/10AHl1bbD_EOsC6Xj30ZCD6QAm1_85r3R/view?usp=sharing\", \"type\": \"weblink\", \"title\": \"Saving Face (Livrando a Cara) - Legendado - [AMY-Scans](478_P).mp4\", \"faviconUrl\": \"https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png\", \"description\": \"\", \"previewImageFileKey\": \"\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"imagine me and you (lésbicas tbm)\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"url\": \"https://drive.google.com/file/d/1-4QuZidPFgQjBQxkaye3dnSzaCLRbgX1/view?usp=sharing\", \"type\": \"weblink\", \"title\": \"Imagine Eu e Você [2005] – Legendado – Online _ Download – AMY-Scans(544_P).mp4\", \"faviconUrl\": \"https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png\", \"description\": \"\", \"previewImageFileKey\": \"\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"as you are\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"url\": \"https://drive.google.com/file/d/1-CrjOFvOUlNMONNaNL6asN2OZwGcRT-Q/view?usp=drive_link\", \"type\": \"weblink\", \"title\": \"As.You.Are.2016.mp4\", \"faviconUrl\": \"https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png\", \"description\": \"\", \"previewImageFileKey\": \"\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"the bear \", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"url\": \"https://drive.google.com/drive/folders/1dLsNu37QpC7KKU_BhGtClXaD56oKeQyH?usp=drive_link\", \"type\": \"weblink\", \"title\": \"O Urso (The Bear) - Google Drive\", \"faviconUrl\": \"//ssl.gstatic.com/docs/doclist/images/drive_2022q3_32dp.png\", \"description\": \"\", \"previewImageFileKey\": \"\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"we live in time (depressao suicidio morte arte choro sexo fofura comédia)\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"url\": \"https://drive.google.com/file/d/1A8FKdFLUzTFdhb8BZy4lnbycLxtLLUAp/view?usp=drive_link\", \"type\": \"weblink\", \"title\": \"We.Live.In.Time.2024.1080p.WEBRip.x264.AAC5.1-[YTS.MX].mp4\", \"faviconUrl\": \"https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png\", \"description\": \"\", \"previewImageFileKey\": \"\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0}],"order":222,"content":"{\"content\":[{\"attrs\":{\"id\":\"eb863b8b-ea41-4647-a005-3e3ca507ec69\"},\"content\":[{\"text\":\"eu sei que vc nunca vai assistir mas vou fazer isso mesmo assim\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"id\":\"2a97e7d0-2155-498e-ba81-a276a05ebdb5\"},\"type\":\"paragraph\"},{\"attrs\":{\"id\":\"cccf5072-82ec-4ea0-83c2-837c242c4e65\"},\"content\":[{\"text\":\"young hearts\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"description\":\"\",\"faviconUrl\":\"\",\"id\":\"394be34a-e3b9-41b9-b3fe-688399c6615b\",\"isLoading\":false,\"previewImageFileKey\":\"\",\"title\":\"\",\"url\":\"https://drive.google.com/file/d/14GdjuPodgH5q8fxmYpsrMVGkUr_0tbpX/view?usp=sharing\"},\"type\":\"weblink\"},{\"attrs\":{\"id\":\"f6207997-7cbc-4757-bf19-ca01d0749657\"},\"content\":[{\"text\":\"look back\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"description\":\"\",\"faviconUrl\":\"https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png\",\"id\":\"7a9c66d5-6099-4e19-b321-0f02dee38ad7\",\"isLoading\":false,\"previewImageFileKey\":\"\",\"title\":\"LOOK BACK LEG (t.me/driveprime).mp4\",\"url\":\"https://drive.google.com/file/d/143SDnXKvNiX4PI0U3iykzpWC2CFD2nQO/view?usp=sharing\"},\"type\":\"weblink\"},{\"attrs\":{\"id\":\"0b95eeed-ab6c-4806-ad55-c7017631be81\"},\"content\":[{\"text\":\"doukyuusei (anime de bichas)\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"description\":\"\",\"faviconUrl\":\"https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png\",\"id\":\"0e6b9c87-0e3b-470d-8be9-94a5dbd1b77e\",\"isLoading\":false,\"previewImageFileKey\":\"\",\"title\":\"[Peak Spider Fansub]Doukyuusei.mp4\",\"url\":\"https://drive.google.com/file/d/1cBs7Gz3pt-1CSfsf8ZAbGCF77Ps3r60J/view?usp=sharing\"},\"type\":\"weblink\"},{\"attrs\":{\"id\":\"3c554b55-9529-4c39-9772-d6057cd954cb\"},\"content\":[{\"text\":\"saving face (filme de lésbicas)\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"description\":\"\",\"faviconUrl\":\"https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png\",\"id\":\"abed94a3-53e7-4f60-8388-559592dc8a76\",\"isLoading\":false,\"previewImageFileKey\":\"\",\"title\":\"Saving Face (Livrando a Cara) - Legendado - [AMY-Scans](478_P).mp4\",\"url\":\"https://drive.google.com/file/d/10AHl1bbD_EOsC6Xj30ZCD6QAm1_85r3R/view?usp=sharing\"},\"type\":\"weblink\"},{\"attrs\":{\"id\":\"0f7c539a-573c-4ba2-aea9-a84f1a97c055\"},\"content\":[{\"text\":\"imagine me and you (lésbicas tbm)\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"description\":\"\",\"faviconUrl\":\"https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png\",\"id\":\"f68f6a3c-1221-427b-8d3b-51b1df662b7f\",\"isLoading\":false,\"previewImageFileKey\":\"\",\"title\":\"Imagine Eu e Você [2005] – Legendado – Online _ Download – AMY-Scans(544_P).mp4\",\"url\":\"https://drive.google.com/file/d/1-4QuZidPFgQjBQxkaye3dnSzaCLRbgX1/view?usp=sharing\"},\"type\":\"weblink\"},{\"attrs\":{\"id\":\"88551573-8fbd-4945-9b5a-899d8a635a48\"},\"content\":[{\"text\":\"as you are\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"description\":\"\",\"faviconUrl\":\"https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png\",\"id\":\"a1dede61-bc7c-45f3-85b1-07951a724dbc\",\"isLoading\":false,\"previewImageFileKey\":\"\",\"title\":\"As.You.Are.2016.mp4\",\"url\":\"https://drive.google.com/file/d/1-CrjOFvOUlNMONNaNL6asN2OZwGcRT-Q/view?usp=drive_link\"},\"type\":\"weblink\"},{\"attrs\":{\"id\":\"9f0a2081-baef-476d-b102-dd15aef25cac\"},\"content\":[{\"text\":\"the bear \",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"description\":\"\",\"faviconUrl\":\"//ssl.gstatic.com/docs/doclist/images/drive_2022q3_32dp.png\",\"id\":\"a60cad9a-f462-4f46-88cd-3106577b0d5a\",\"isLoading\":false,\"previewImageFileKey\":\"\",\"title\":\"O Urso (The Bear) - Google Drive\",\"url\":\"https://drive.google.com/drive/folders/1dLsNu37QpC7KKU_BhGtClXaD56oKeQyH?usp=drive_link\"},\"type\":\"weblink\"},{\"attrs\":{\"id\":\"a3c7248c-89ba-4196-8cd7-e96ecaa9887d\"},\"content\":[{\"text\":\"we live in time (depressao suicidio morte arte choro sexo fofura comédia)\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"description\":\"\",\"faviconUrl\":\"https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png\",\"id\":\"6ed3382f-808a-42ff-8ecc-d01ecdd2214f\",\"isLoading\":false,\"previewImageFileKey\":\"\",\"title\":\"We.Live.In.Time.2024.1080p.WEBRip.x264.AAC5.1-[YTS.MX].mp4\",\"url\":\"https://drive.google.com/file/d/1A8FKdFLUzTFdhb8BZy4lnbycLxtLLUAp/view?usp=drive_link\"},\"type\":\"weblink\"},{\"attrs\":{\"id\":\"ae3121a0-832d-46be-883e-cd1dddfd6a4f\"},\"content\":[{\"text\":\"speak (merdinhas sobre abuso ent pode dar gatilho, é triste mas é bem bom e a personagem principal tem um estilo foda)\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"id\":\"964ffe87-9ab5-4332-bdbc-8881dcf82ee6\"},\"content\":[{\"marks\":[{\"attrs\":{\"class\":\"text-blue-500 underline hover:text-blue-700\",\"href\":\"https://drive.google.com/file/d/1Pn27L8L2ZZpaJSJpMYHJ5uZYFmzMSx6h/view?usp=drivesdk\",\"rel\":\"noopener noreferrer nofollow\",\"target\":\"_blank\"},\"type\":\"link\"}],\"text\":\"https://drive.google.com/file/d/1m3scZicy7oaXAf07sGitdPBJXicTh-Ci/view?usp=drivesdk\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"id\":\"8859f03c-f28c-47b0-987e-7e5f8cc40561\"},\"content\":[{\"text\":\"carol (filme de lésbicas sendo confusas com uma tensão sexual fodida e mt chiques e fumantes e fodas e é triste em certo ponto)\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"id\":\"b45d5d34-715d-425b-967f-276b60e3d69d\"},\"content\":[{\"marks\":[{\"attrs\":{\"class\":\"text-blue-500 underline hover:text-blue-700\",\"href\":\"https://drive.google.com/file/d/1m3scZicy7oaXAf07sGitdPBJXicTh-Ci/view?usp=drivesdk\",\"rel\":\"noopener noreferrer nofollow\",\"target\":\"_blank\"},\"type\":\"link\"}],\"text\":\"https://drive.google.com/file/d/1Pn27L8L2ZZpaJSJpMYHJ5uZYFmzMSx6h/view?usp=drivesdk\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"id\":\"e526384c-a4bd-4b6b-8d79-1036b307bbce\"},\"type\":\"paragraph\"},{\"attrs\":{\"id\":\"aadabf95-778e-4c2c-9b63-f770098f499f\"},\"type\":\"paragraph\"}],\"type\":\"doc\"}"},{"id":"80a57d54-b543-48b9-a502-bfa1b5d05c7e","title":"photo_4902601131847430498_y.jpg","type":"Image","xCoord":597.6153903415869,"yCoord":397.48357916927483,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":22,"content":"photo_4902601131847430498_y.jpg","url":"assets/80a57d54-b543-48b9-a502-bfa1b5d05c7e.webp","width":199,"height":200},{"id":"6e1d2c2b-2160-4cff-9ec7-9ab3168991ac","title":"","type":"IframeEmbed","xCoord":1410.9141856090662,"yCoord":590.5171689642164,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":200,"url":"https://open.spotify.com/intl-pt/track/6WTFHKrnZpwEBLRS10Ylqs?si=7b6ccedd98304a4f"},{"id":"39a438ba-8eeb-4f9d-a0f2-2bfbd0cdb22e","title":"","type":"WebLink","xCoord":1107.9387646255675,"yCoord":393.0140973596454,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":56,"url":"https://br.pinterest.com/bluemaah/star/","_openGraph":{"description":"","faviconUrl":"https://s.pinimg.com/webapp/logo_transparent_144x144-3da7a67b.png","previewImageFileKey":"","title":"","url":""}},{"id":"2cfc6dcc-bf59-4c69-a4d1-6360c097fb22","title":"","type":"InlineText","xCoord":1253.5032074574453,"yCoord":250.99539521501413,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":28,"content":"fiz uma pasta no pinterest pra vc"},{"id":"4538e94a-df27-46df-bad0-b86b0d9ad54d","title":"coisas que eu gosto em vc (ou algo assim","type":"Text","xCoord":1268.0762691456307,"yCoord":179.11396587884008,"outgoingLinks":[],"incomingLinks":[],"childBlocks":[{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"quando vc é bonitinha e sempre que vc fala algo me vem vc na cabeça com aquele emoji de lacinho\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"teu cabelo\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"tuas gatas \", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"tua mãe rsrs\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"o teu pinterest, que vc nunca deixa público aliás (emoji triste com depressão morrendo)\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"teu cérebro (não literalmente o cérebro)\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"teu jeito de regulus/draco/barty\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"quando vc não me xinga o dia inteiro\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"quando fazemos algo juntos tipo aquela merdinha de dizer quem faria o que em determinada situação\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"nossas conversas\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"as fotos que vc manda do nada\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"nossas conversas a noite??? não sei se faz sentido\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"o tua mania de ajudar todos\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"quando vc da aqueles saltinhos de alegria\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"content\": [{\"text\": \"a voz que vc faz quando vc tá sendo ironica\", \"type\": \"text\", \"styles\": {}}], \"isBulletListItem\": true, \"isNumberedListItem\": false}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0}],"order":226,"content":"{\"content\":[{\"attrs\":{\"id\":\"d0b55be0-ca4b-45cb-8329-3e137b5db20c\"},\"type\":\"paragraph\"},{\"content\":[{\"attrs\":{\"id\":\"13bd46ec-9299-45eb-9a06-37e5d4760112\"},\"content\":[{\"attrs\":{\"id\":\"e2f97c75-8f8b-45f9-a6d4-6a1883450d82\"},\"content\":[{\"text\":\"quando vc é bonitinha e sempre que vc fala algo me vem vc na cabeça com aquele emoji de lacinho\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"b63231d3-8d2d-4ebe-ae2a-52c525d07569\"},\"content\":[{\"attrs\":{\"id\":\"23a54f09-38b2-449f-b10c-380f906fefff\"},\"content\":[{\"text\":\"teu cabelo\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"b8cf4bbf-688e-4290-bf2e-c81a90f542bc\"},\"content\":[{\"attrs\":{\"id\":\"ac8a6855-45f8-46e7-85fa-8f90031d8ca2\"},\"content\":[{\"text\":\"tuas gatas \",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"6ce736bc-807d-4880-b5fb-327e8a23684c\"},\"content\":[{\"attrs\":{\"id\":\"686dd3ac-b932-462a-a988-fb61ae59f2f9\"},\"content\":[{\"text\":\"tua mãe rsrs\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"78d079fb-5d0e-4447-9c5d-c58c19922666\"},\"content\":[{\"attrs\":{\"id\":\"45d548ca-ec13-4ef4-ac8c-ae4183720180\"},\"content\":[{\"text\":\"o teu pinterest, que vc nunca deixa público aliás (emoji triste com depressão morrendo)\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"e1af3992-8b4a-4a4d-8f1e-94b8138a8a57\"},\"content\":[{\"attrs\":{\"id\":\"ed4bb9d4-389c-4a69-b6ea-3264b98931bd\"},\"content\":[{\"text\":\"teu cérebro (não literalmente o cérebro)\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"aa60df4f-0df9-4825-870c-2772cc463c33\"},\"content\":[{\"attrs\":{\"id\":\"a98c5c0a-d5de-465b-b33e-0daf03c3f0ea\"},\"content\":[{\"text\":\"teu jeito de regulus/draco/barty\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"05e67555-2048-425a-857c-8d3705d714d3\"},\"content\":[{\"attrs\":{\"id\":\"4d0312b9-7ab6-4a0f-97a8-64d4f58435ce\"},\"content\":[{\"text\":\"quando vc não me xinga o dia inteiro\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"9f3885d1-0bd5-4447-b543-ba969bb90b96\"},\"content\":[{\"attrs\":{\"id\":\"1c750425-8d30-4b83-aa97-25758ea931be\"},\"content\":[{\"text\":\"quando fazemos algo juntos tipo aquela merdinha de dizer quem faria o que em determinada situação\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"cf072c27-4d68-4636-9411-d410d57def92\"},\"content\":[{\"attrs\":{\"id\":\"89076dbd-ab12-42fb-83c0-67499f771558\"},\"content\":[{\"text\":\"nossas conversas\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"71c2fea4-3a98-4556-8158-3b82e21c9dcc\"},\"content\":[{\"attrs\":{\"id\":\"104eb941-bbcc-40dd-80a3-64d70ed32446\"},\"content\":[{\"text\":\"as fotos que vc manda do nada\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"4f7690ed-2206-4bba-8fee-9e23b1766151\"},\"content\":[{\"attrs\":{\"id\":\"104165db-8381-4fca-804d-e412f6db065c\"},\"content\":[{\"text\":\"nossas conversas a noite??? não sei se faz sentido\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"dc70ade5-6940-4c9a-a263-cf4bba7805b6\"},\"content\":[{\"attrs\":{\"id\":\"b9552e73-a011-4b89-96bd-ace3b1bb3efc\"},\"content\":[{\"text\":\"o tua mania de ajudar todos\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"a4d4584f-4308-494d-b064-1ca8e4f940af\"},\"content\":[{\"attrs\":{\"id\":\"654b0254-803a-4c82-826f-caca3643d89d\"},\"content\":[{\"text\":\"quando vc da aqueles saltinhos de alegria\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"cd6f7e40-5be6-4c20-a058-7b69ac070649\"},\"content\":[{\"attrs\":{\"id\":\"a49ef079-6142-4bf4-b5fe-0e03c5bc35a7\"},\"content\":[{\"text\":\"a voz que vc faz quando vc tá sendo ironica\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"1101f58f-26ab-477f-8eb7-3af7cc0da4ce\"},\"content\":[{\"attrs\":{\"id\":\"6d74f1b7-1217-49ee-8a48-481fb5a86fc5\"},\"content\":[{\"text\":\"o teu jeito de ser extremamente expressiva\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"},{\"attrs\":{\"id\":\"2fe3e050-f275-43b3-9d35-b2d686b2fc65\"},\"content\":[{\"attrs\":{\"id\":\"9d36ef04-c1f4-46ad-9f5f-fd0684042435\"},\"content\":[{\"text\":\"quando vc me mostra as tuas unhas\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"listItem\"}],\"type\":\"bulletList\"},{\"attrs\":{\"id\":\"0d33f7cd-7f41-4367-8846-3a9d9755e583\"},\"type\":\"paragraph\"}],\"type\":\"doc\"}"},{"id":"3498e3ec-ef63-4f92-a9fb-5859782b1ea5","title":"","type":"IframeEmbed","xCoord":223.163340473618,"yCoord":210.88825700380607,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":0,"url":"https://open.spotify.com/intl-pt/track/4TncWhCfACwaIU8hllz8SQ?si=6484d9b7d5224bf7"},{"id":"405e161e-885d-4366-a04e-3578e875cc9e","title":"wonders of the cosmos.jpg","type":"Image","xCoord":1029.0963340761145,"yCoord":196.93665479104973,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":210,"content":"wonders of the cosmos.jpg","url":"assets/405e161e-885d-4366-a04e-3578e875cc9e.webp","width":200,"height":177},{"id":"ca7c16ce-b57a-4760-ab23-c4867ca5861d","title":"","type":"InlineText","xCoord":555.860196312137,"yCoord":187.0114788996394,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":2,"content":"FELIZ ANIVERSÁRIO"},{"id":"fb01f689-dd7e-4d44-aa76-19fdb7e1e443","title":"","type":"IframeEmbed","xCoord":221.82656462132303,"yCoord":415.7869243984926,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":32,"url":"https://open.spotify.com/intl-pt/track/2prqm9sPLj10B4Wg0wE5x9?si=e9440f655c694c8e"},{"id":"986af8dc-780a-44a6-8131-e71b3fcfd3af","title":"","type":"IframeEmbed","xCoord":222.90062774573084,"yCoord":309.4546750821242,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":38,"url":"https://open.spotify.com/intl-pt/track/5plW0IS6XNNFFvLCH15edI?si=cb6d452ad44943ee"},{"id":"cc377d92-0092-428f-8b73-5934594a2819","title":"898e9d5b-4814-42fc-97b2-e003dc24ca0d.jpg","type":"Image","xCoord":1538.4410087146705,"yCoord":249.56838929365477,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":58,"content":"898e9d5b-4814-42fc-97b2-e003dc24ca0d.jpg","url":"assets/cc377d92-0092-428f-8b73-5934594a2819.webp","width":153,"height":200},{"id":"dd738f80-e203-4c8f-8fec-beaca50bb0ec","title":"c34ad6d2-d815-4145-8590-8859835b117d.jpg","type":"Image","xCoord":270.41189588823903,"yCoord":27.55001717381142,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":52,"content":"c34ad6d2-d815-4145-8590-8859835b117d.jpg","url":"assets/dd738f80-e203-4c8f-8fec-beaca50bb0ec.webp","width":200,"height":133},{"id":"19739cad-33cf-4ccc-912a-6531c0c8d927","title":"","type":"IframeEmbed","xCoord":219.7373761840958,"yCoord":513.9768090308371,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":68,"url":"https://open.spotify.com/intl-pt/track/0WQiDwKJclirSYG9v5tayI?si=40fc83c604484c6d"},{"id":"a7f2a65f-7613-4924-8183-dd4f6c1923dc","title":"{\"nodeId\":\"27d8389d-ac36-4a38-982f-480d4a17de2b\",\"spaceId\":\"3725d9be-49df-11ef-848f-3bce1b519dd7\",\"spaceTitle\":\"for ace \u003c3\",\"userId\":\"afcad118-49de-11ef-bc8a-5b77ebc56556\",\"username\":\"roulettes\",\"avatarUrl\":\"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/a600543b-8c4c-442a-9d38-b59bdf831800/avatar\",\"thumbnailUrl\":\"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/1b5ac00b-8a81-4c04-680b-4f54daf06f00/space\"}","type":"Image","xCoord":1131.9274213065016,"yCoord":449.51258956340894,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":72,"content":"{\"avatarUrl\":\"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/a600543b-8c4c-442a-9d38-b59bdf831800/avatar\",\"nodeId\":\"27d8389d-ac36-4a38-982f-480d4a17de2b\",\"spaceId\":\"3725d9be-49df-11ef-848f-3bce1b519dd7\",\"spaceTitle\":\"for ace \\u003c3\",\"thumbnailUrl\":\"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/1b5ac00b-8a81-4c04-680b-4f54daf06f00/space\",\"userId\":\"afcad118-49de-11ef-bc8a-5b77ebc56556\",\"username\":\"roulettes\"}","url":"assets/a7f2a65f-7613-4924-8183-dd4f6c1923dc.webp","width":188,"height":150},{"id":"3326810f-18e1-4925-b9cd-27ffb1fccbcd","title":"{\"nodeId\":\"8ddc748a-77e0-422f-b9f3-d7bc5831fa42\",\"spaceId\":\"08bd758c-9228-11ef-8ca7-9b194010a3c3\",\"spaceTitle\":\"diardin's birthday\",\"userId\":\"73d4bb1a-9222-11ef-970a-6f72227bbba7\",\"username\":\"cuudblies\",\"avatarUrl\":null,\"thumbnailUrl\":\"https://media4.giphy.com/media/AxRjMaovFNBztkPtxd/giphy.gif?cid=e9edbae3jnso7zagwlmcp1tz895e7izdvxx9alpt9hvbicw0\u0026ep=v1_stickers_search\u0026rid=giphy.gif\u0026ct=s\"}","type":"Image","xCoord":949,"yCoord":412,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":206,"content":"{\"avatarUrl\":null,\"nodeId\":\"8ddc748a-77e0-422f-b9f3-d7bc5831fa42\",\"spaceId\":\"08bd758c-9228-11ef-8ca7-9b194010a3c3\",\"spaceTitle\":\"diardin's birthday\",\"thumbnailUrl\":\"https://media4.giphy.com/media/AxRjMaovFNBztkPtxd/giphy.gif?cid=e9edbae3jnso7zagwlmcp1tz895e7izdvxx9alpt9hvbicw0\\u0026ep=v1_stickers_search\\u0026rid=giphy.gif\\u0026ct=s\",\"userId\":\"73d4bb1a-9222-11ef-970a-6f72227bbba7\",\"username\":\"cuudblies\"}","url":"assets/3326810f-18e1-4925-b9cd-27ffb1fccbcd.gif","width":134,"height":134},{"id":"50056152-3f4a-49c7-980d-4c895cdffdc6","title":"","type":"InlineText","xCoord":1293.6026094704125,"yCoord":-22.247919125809066,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":112,"content":"músicas que eu quero que vc escute"},{"id":"4fb613dc-b756-41e5-9e66-72a18a3279f9","title":"","type":"Image","xCoord":484.79839920593815,"yCoord":9.491745417722356,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":126,"url":"assets/4fb613dc-b756-41e5-9e66-72a18a3279f9.gif","width":172,"height":172},{"id":"bee31d99-9f3a-4cfb-a68d-03d11ccd57a3","title":"","type":"Image","xCoord":610.6625861889079,"yCoord":20.43645732928495,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":124,"url":"assets/bee31d99-9f3a-4cfb-a68d-03d11ccd57a3.gif","width":132,"height":132},{"id":"008b113e-ec27-47ec-9deb-d85144a39ada","title":"","type":"Image","xCoord":968.5546656970035,"yCoord":28.09775566737875,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":214,"url":"assets/008b113e-ec27-47ec-9deb-d85144a39ada.gif","width":127,"height":127},{"id":"f5e856b8-5df9-4df0-8808-026e20a68360","title":"","type":"Image","xCoord":720.1097053045333,"yCoord":27.003284476222504,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":216,"url":"assets/f5e856b8-5df9-4df0-8808-026e20a68360.gif","width":134,"height":134},{"id":"025fc1b6-53f1-4bcf-a754-180d645de6cd","title":"","type":"Image","xCoord":1641.6544482581016,"yCoord":451.6581066448502,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":136,"url":"assets/025fc1b6-53f1-4bcf-a754-180d645de6cd.gif","width":76,"height":108},{"id":"3f61d834-5b7b-4c52-ad16-3f70ab7a7889","title":"","type":"Image","xCoord":287.39262191618656,"yCoord":29.192226858535008,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":140,"url":"assets/3f61d834-5b7b-4c52-ad16-3f70ab7a7889.gif","width":161,"height":124},{"id":"081b4597-1745-4d92-b441-5b7dad57238f","title":"","type":"Image","xCoord":844,"yCoord":26,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":182,"url":"assets/081b4597-1745-4d92-b441-5b7dad57238f.gif","width":134,"height":134},{"id":"b4851432-78cd-4eb7-bbd2-5b525a534889","title":"a3Bd1GF-AOaDgxs7AOnj5-transformed.png","type":"Image","xCoord":1474.2003560111948,"yCoord":41.450284159119064,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":160,"content":"a3Bd1GF-AOaDgxs7AOnj5-transformed.png","url":"assets/b4851432-78cd-4eb7-bbd2-5b525a534889.webp","width":141,"height":141},{"id":"3b59b670-268b-4e00-b6ff-4bffa24beb9a","title":"_cat_reading_book_sticker__Sticker_for_Sale_by_Zelius-removebg-preview.png","type":"Image","xCoord":1375.4790545689,"yCoord":340.2409193447772,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":172,"content":"_cat_reading_book_sticker__Sticker_for_Sale_by_Zelius-removebg-preview.png","url":"assets/3b59b670-268b-4e00-b6ff-4bffa24beb9a.webp","width":150,"height":200},{"id":"b6a84372-3286-40fb-99ae-36888133a4ee","title":"download-removebg-preview.png","type":"Image","xCoord":1636.6175232709015,"yCoord":88.76523679108789,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":170,"content":"download-removebg-preview.png","url":"assets/b6a84372-3286-40fb-99ae-36888133a4ee.webp","width":149,"height":77},{"id":"d1adb69e-bbbd-413e-8c63-0992f4c41400","title":"Star_Iron-on_Patch_-_Dark_blue_background-removebg-preview.png","type":"Image","xCoord":809.6374487411151,"yCoord":427.7986146372778,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":176,"content":"Star_Iron-on_Patch_-_Dark_blue_background-removebg-preview.png","url":"assets/d1adb69e-bbbd-413e-8c63-0992f4c41400.webp","width":125,"height":125},{"id":"9a934e19-e88f-4a3f-a84d-4ca915097a16","title":"download__2_-removebg-preview.png","type":"Image","xCoord":1070.1215922363044,"yCoord":-75.65813329460056,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":198,"content":"download__2_-removebg-preview.png","url":"assets/9a934e19-e88f-4a3f-a84d-4ca915097a16.webp","width":180,"height":157},{"id":"84f300df-80f6-4ffe-b612-1ed4f57caf02","title":"Cute_dinosaur_in_party_hat_with_red_balloon_funny_vector_image_on_VectorStock-removebg-preview.png","type":"Image","xCoord":144.19896451811093,"yCoord":54.58393845299403,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":188,"content":"Cute_dinosaur_in_party_hat_with_red_balloon_funny_vector_image_on_VectorStock-removebg-preview.png","url":"assets/84f300df-80f6-4ffe-b612-1ed4f57caf02.webp","width":185,"height":200},{"id":"8a1383bf-9e09-4bb9-987d-832ea0660269","title":"e5f518ad-7d5d-42df-922a-99b3d6a8df71-removebg-preview.png","type":"Image","xCoord":777.8977841975837,"yCoord":139.95269136318203,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":202,"content":"e5f518ad-7d5d-42df-922a-99b3d6a8df71-removebg-preview.png","url":"assets/8a1383bf-9e09-4bb9-987d-832ea0660269.webp","width":200,"height":200},{"id":"853c5eb2-ef6a-47dc-9448-0ce3581ea93c","title":"mira-removebg-preview.png","type":"Image","xCoord":485.6739761588633,"yCoord":555.8517440025597,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":194,"content":"mira-removebg-preview.png","url":"assets/853c5eb2-ef6a-47dc-9448-0ce3581ea93c.webp","width":140,"height":140},{"id":"94890581-5b43-4a0e-acd3-f8566e520bf5","title":"clica aqui","type":"Text","xCoord":1228.8199149539616,"yCoord":636.8426121481227,"outgoingLinks":[],"incomingLinks":[],"childBlocks":[{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"{\"imageSrc\": \"https://imagedelivery.net/skpYddqS_PZlpdza2qJ0cw/62d9de88-a67e-4369-1f4b-6f78d961b300/public\"}","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0},{"id":"00000000-0000-0000-0000-000000000000","created":"0001-01-01T00:00:00Z","updated":"0001-01-01T00:00:00Z","creator":null,"deletion":null,"owningNode":null,"parentId":null,"forkedFrom":null,"blockData":"[{\"text\": \"                                                                         oi linda rs\", \"type\": \"text\", \"styles\": {}}]","outgoingLinks":null,"childBlocks":[],"blockType":"text","orderInParent":0}],"order":0,"url":"assets/94890581-5b43-4a0e-acd3-f8566e520bf5.webp"}],"spaceBlocks":[]}</script>
+  <script type="module">
+    import { h, render } from 'https://esm.sh/preact';
+    import { useState, useRef, useLayoutEffect } from 'https://esm.sh/preact/hooks';
+    import htm from 'https://esm.sh/htm';
+    const html = htm.bind(h);
+    const MIN_ZOOM = 0.1;
+    const MAX_ZOOM = 1.5;
+    const clamp = (v,min,max)=>Math.min(max,Math.max(min,v));
+    const ASSETS_PATH = "assets/";
+    function usePanZoom(wrapperRef, initialScale = 1, initialOffset = { x: 0, y: 0 }) {
+      const [scale, setScale] = useState(initialScale);
+      const [offset, setOffset] = useState(initialOffset);
+      const ptr = useRef(null);
+      // Allow external update of scale/offset
+      const setPanZoom = (newScale, newOffset) => {
+        setScale(newScale);
+        setOffset(newOffset);
+      };
+      const onPointerDown = (e) => {
+        ptr.current = {
+          id: e.pointerId,
+          x: e.clientX,
+          y: e.clientY,
+          start: { ...offset },
+        };
+        e.target.setPointerCapture(e.pointerId);
+      };
+      const onPointerMove = (e) => {
+        if (!ptr.current || e.pointerId !== ptr.current.id) return;
+        setOffset({
+          x: ptr.current.start.x + e.clientX - ptr.current.x,
+          y: ptr.current.start.y + e.clientY - ptr.current.y,
+        });
+      };
+      const onPointerUp = (e) => {
+        if (ptr.current && e.pointerId === ptr.current.id) {
+          e.target.releasePointerCapture(e.pointerId);
+          ptr.current = null;
+        }
+      };
+      const onWheel = (e) => {
+        e.preventDefault();
+        if (!wrapperRef.current) return;
+        const rect = wrapperRef.current.getBoundingClientRect();
+        const mx = e.clientX - rect.left,
+          my = e.clientY - rect.top;
+        const factor = 1 - 0.001 * e.deltaY;
+        const newScale = clamp(scale * factor, MIN_ZOOM, MAX_ZOOM);
+        const worldX = (mx - offset.x) / scale,
+          worldY = (my - offset.y) / scale;
+        const newOffset = { x: mx - worldX * newScale, y: my - worldY * newScale };
+        setScale(newScale);
+        setOffset(newOffset);
+      };
+      return { scale, offset, onPointerDown, onPointerMove, onPointerUp, onWheel, setPanZoom };
+    }
+    function Node({node,openSide}){
+      const style={left:`${node.xCoord}px`,top:`${node.yCoord}px`,zIndex:(node.order||0)+2};
+      const handleClick=()=>{if(node.type==='Text') openSide(node);} ;
+      switch(node.type){
+        case 'Text':
+          return html`<div class="node text-node" style=${style} onClick=${()=>openSide(node)}>
+            <svg class="w-3 h-3 mr-1.5 group-hover:rotate-20" viewBox="0 0 384 512" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right:8px;width:16px;height:16px;"><path d="M64 32C46.3 32 32 46.3 32 64V448c0 17.7 14.3 32 32 32H320c17.7 0 32-14.3 32-32V64c0-17.7-14.3-32-32-32H64zM0 64C0 28.7 28.7 0 64 0H320c35.3 0 64 28.7 64 64V448c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V64zm80 64H304c8.8 0 16 7.2 16 16s-7.2 16-16 16H80c-8.8 0-16-7.2-16-16s7.2-16 16-16zm0 96H304c8.8 0 16 7.2 16 16s-7.2 16-16 16H80c-8.8 0-16-7.2-16-16s7.2-16 16-16zm0 96H208c8.8 0 16 7.2 16 16s-7.2 16-16 16H80c-8.8 0-16-7.2-16-16s7.2-16 16-16z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+            <span>${node.title||'Untitled'}</span>
+          </div>`;
+        case 'Image':
+          return html`<div class="node image-node" style=${style}><img src=${node.url} width=${node.width||200} height=${node.height||150} alt=${node.title} /></div>`;
+        case 'InlineText':
+          return html`<div class="node inline-text-node" style=${style}>${node.content||node.title}</div>`;
+        case 'WebLink': {
+          const og = node._openGraph || {};
+          const imageUrl = og.previewImageFileKey || "https://placehold.co/400x400";
+          const title = og.title || node.title || node.url || "Untitled";
+          const url = og.url || node.url || "#";
+          const favicon = og.faviconUrl;
+          let domain = "";
+          try {
+            domain = new URL(url).hostname.replace(/^www\./, "");
+          } catch {}
+          return html`
+            <a href=${url} target="_blank" rel="noopener" class="node weblink-node" style="left:${node.xCoord}px;top:${node.yCoord}px;z-index:${(node.order||0)+2};">
+              <img src=${imageUrl} alt=${title} class="preview" />
+              <div class="weblink-content">
+                <div class="weblink-title">${title}</div>
+                <div class="weblink-domain">
+                  ${favicon && html`<img src=${favicon} alt="favicon" class="weblink-favicon" />`}
+                  <span>${domain}</span>
+                </div>
+              </div>
+            </a>
+          `;
+        }
+        case 'IframeEmbed': {
+          // Use node.width/node.height if available, else fallback
+          const width = node.width || (node.url && node.url.includes('spotify.com') ? 320 : 400);
+          const height = node.height || (node.url && node.url.includes('spotify.com') ? 80 : 225);
+
+          let embed = null;
+          if (node.url) {
+            if (node.url.includes('youtube.com') || node.url.includes('youtu.be')) {
+              let videoId = '';
+              const ytMatch = node.url.match(/(?:youtube.com\/watch\?v=|youtu.be\/)([\w-]+)/);
+              if (ytMatch) videoId = ytMatch[1];
+              if (videoId) {
+                embed = html`<iframe width=${width} height=${height} src=${`https://www.youtube.com/embed/${videoId}`} frameborder="0" allowfullscreen></iframe>`;
+              }
+            } else if (node.url.includes('spotify.com')) {
+              // Robustly convert Spotify URLs to embed URLs
+              let embedUrl = node.url;
+              // Only transform if not already an embed URL
+              if (!/\/embed\//.test(embedUrl)) {
+                // Match /track/, /album/, /playlist/, etc.
+                const match = embedUrl.match(/https?:\/\/open\.spotify\.com\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)(\?.*)?/);
+                if (match) {
+                  embedUrl = `https://open.spotify.com/embed/${match[1]}/${match[2]}`;
+                }
+              }
+              embed = html`<iframe width=${width} height=${height} src=${embedUrl} frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>`;
+            } else {
+              embed = html`<iframe width=${width} height=${height} src=${node.url} frameborder="0"></iframe>`;
+            }
+          }
+
+          const styleProp = {...style, width: width + 'px', height: height + 'px'}
+          return html`<div class="node iframe-node" style=${styleProp}>
+            ${embed || html`<div class="iframe-placeholder">Embed</div>`}
+          </div>`;
+        }
+        default:
+          return html`<div class="node" style=${style}>${node.title}</div>`;
+      }
+    }
+    function Connections({nodes}){
+      const map = new Map(nodes.map((n) => [n.id, n]));
+      const lines = [];
+      nodes.forEach((n) =>
+        n.outgoingLinks?.forEach((l) => {
+          const t = map.get(l.id);
+          if (t) lines.push([n, t]);
+        }),
+      );
+      return html`<svg class="connections">
+        ${lines.map(([a, b]) => {
+          const aw = a.width ?? 200,
+            ah = a.height ?? 150;
+          const bw = b.width ?? 200,
+            bh = b.height ?? 150;
+          const ax = a.xCoord + aw / 2,
+            ay = a.yCoord + ah / 2,
+            bx = b.xCoord + bw / 2,
+            by = b.yCoord + bh / 2;
+          return html`<line
+            x1=${ax}
+            y1=${ay}
+            x2=${bx}
+            y2=${by}
+            stroke="#888"
+            stroke-width="2"
+          />`;
+        })}
+      </svg>`;
+    }
+    // --- Tiptap/Legacy Renderer ---
+    function renderTiptap(node) {
+      if (!node) return null;
+      if (Array.isArray(node)) return node.map(renderTiptap);
+      switch (node.type) {
+        case 'doc':
+          return renderTiptap(node.content);
+        case 'paragraph':
+          return html`<p>${renderTiptap(node.content)}</p>`;
+        case 'heading': {
+          const level = node.attrs?.level || 1;
+          const tag = `h${level}`;
+          return h(tag, {}, renderTiptap(node.content));
+        }
+        case 'orderedList':
+          return html`<ol>${renderTiptap(node.content)}</ol>`;
+        case 'bulletList':
+          return html`<ul>${renderTiptap(node.content)}</ul>`;
+        case 'listItem':
+          return html`<li>${renderTiptap(node.content)}</li>`;
+        case 'text': {
+          let text = node.text;
+          if (node.marks) {
+            node.marks.forEach(mark => {
+              switch (mark.type) {
+                case 'bold': text = html`<b>${text}</b>`; break;
+                case 'italic': text = html`<i>${text}</i>`; break;
+                case 'underline': text = html`<u>${text}</u>`; break;
+                case 'highlight': text = html`<mark>${text}</mark>`; break;
+                case 'link':
+                  text = html`<a href=${mark.attrs?.href} target="_blank" rel="noopener">${text}</a>`;
+                  break;
+              }
+            });
+          }
+          return text;
+        }
+        case 'youtube': {
+          const src = node.attrs?.src;
+          const start = node.attrs?.start || 0;
+          let videoID = '';
+          if (src) {
+            if (src.includes('youtube.com')) {
+              const match = src.match(/[?&]v=([^&]+)/);
+              if (match) videoID = match[1];
+            } else if (src.includes('youtu.be/')) {
+              videoID = src.split('youtu.be/')[1].split(/[?&]/)[0];
+            }
+          }
+          if (videoID) {
+            const embedUrl = `https://www.youtube.com/embed/${videoID}?start=${start}`;
+            return html`<iframe width="560" height="315" src=${embedUrl} frameborder="0" allowfullscreen></iframe>`;
+          }
+          return null;
+        }
+        case 'weblink': {
+          const attrs = node.attrs || {};
+          const url = attrs.url || '#';
+          const title = attrs.title || url;
+          const description = attrs.description;
+          let domain = '';
+          try {
+            domain = new URL(url).hostname.replace(/^www\./, '');
+          } catch {}
+          return html`
+            <a href=${url} target="_blank" rel="noopener" class="tiptap-weblink">
+              <div class="tiptap-weblink-title">${title}</div>
+              ${description && html`<div class="tiptap-weblink-description">${description}</div>`}
+              <div class="tiptap-weblink-url">${url}</div>
+            </a>
+          `;
+        }
+        case 'image': {
+          const attrs = node.attrs || {};
+          const src = attrs.src;
+          const alt = attrs.alt || '';
+          const title = attrs.title || '';
+          if (src) {
+            return html`<img src=${src} alt=${alt} title=${title} class="tiptap-image" />`;
+          }
+          return null;
+        }
+        default:
+          return renderTiptap(node.content);
+      }
+    }
+    function renderLegacyBlocks(blocks) {
+      if (!blocks) return null;
+      // Helper to render styles
+      function renderStyledText(text, styles) {
+        let el = text;
+        if (styles) {
+          if (styles.bold) el = html`<b>${el}</b>`;
+          if (styles.italic) el = html`<i>${el}</i>`;
+          if (styles.underline) el = html`<u>${el}</u>`;
+          if (styles.backgroundColor) el = html`<span style=${`background-color:${styles.backgroundColor}`}>${el}</span>`;
+          if (styles.textColor) el = html`<span style=${`color:${styles.textColor}`}>${el}</span>`;
+        }
+        return el;
+      }
+      // Helper to render a block item (text, link, image, pdf, youtube, weblink)
+      function renderBlockItem(item) {
+        if (!item) return null;
+        if (item.type === 'text') {
+          return renderStyledText(item.text, item.styles);
+        } else if (item.type === 'link') {
+          // Render link content recursively if present
+          let content = item.content ? item.content.map(renderBlockItem) : item.href;
+          return html`<a href=${item.href} target="_blank" rel="noopener">${content}</a>`;
+        } else if (item.type === 'image' || item.imageSrc) {
+          const src = item.imageSrc || item.src;
+          return html`<img src=${src} alt="" style="max-width:100%;margin:8px 0;" />`;
+        } else if (item.type === 'pdf' || item.pdfFileKey) {
+          // Render as a link to the PDF file
+          const file = item.pdfFileKey || item.fileKey;
+          return html`<a href=${file} target="_blank" rel="noopener" style="display:block;margin:8px 0;color:#0074d9;">PDF: ${file}</a>`;
+        } else if (item.type === 'youtube' || item.youtubeSrc) {
+          // Accept both video ID and full URL
+          let videoId = item.youtubeSrc;
+          if (videoId && videoId.startsWith('http')) {
+            const match = videoId.match(/[?&]v=([^&]+)/);
+            if (match) videoId = match[1];
+          }
+          if (videoId) {
+            return html`<iframe width="400" height="225" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen style="margin:8px 0;"></iframe>`;
+          }
+        } else if (item.type === 'weblink' || item.url) {
+          // Render a weblink preview
+          const url = item.url;
+          const title = item.title || url;
+          const description = item.description;
+          const previewImage = item.previewImageFileKey;
+          const favicon = item.faviconUrl;
+          let domain = '';
+          try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch {}
+          return html`<a href=${url} target="_blank" rel="noopener" class="tiptap-weblink">
+            ${previewImage && html`<img src=${previewImage} alt="preview" style="width:100%;max-width:320px;max-height:120px;object-fit:cover;border-radius:8px 8px 0 0;" />`}
+            <div class="tiptap-weblink-title">${title}</div>
+            ${description && html`<div class="tiptap-weblink-description">${description}</div>`}
+            <div class="tiptap-weblink-url">${url}</div>
+            ${favicon && html`<img src=${favicon} alt="favicon" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;" />`}<span>${domain}</span>
+          </a>`;
+        }
+        return null;
+      }
+      // Flatten blockData to array of items, handling both array and object
+      function flattenBlockData(blockData) {
+        if (!blockData) return [];
+        if (typeof blockData === 'string') {
+          try {
+            const parsed = JSON.parse(blockData);
+            if (Array.isArray(parsed)) return parsed;
+            else return [parsed];
+          } catch {
+            // Not JSON, treat as plain text
+            return [{ type: 'text', text: blockData }];
+          }
+        } else if (Array.isArray(blockData)) {
+          return blockData;
+        } else if (blockData) {
+          return [blockData];
+        }
+        return [];
+      }
+      // Detect if a block is a heading or list
+      function isHeadingBlock(items) {
+        if (!items) return false;
+        if (Array.isArray(items)) return items.some(i => i.isHeading);
+        return !!items.isHeading;
+      }
+      function isBulletListBlock(items) {
+        if (!items) return false;
+        if (Array.isArray(items)) return items.some(i => i.isBulletListItem);
+        return !!items.isBulletListItem;
+      }
+      function isOrderedListBlock(items) {
+        if (!items) return false;
+        if (Array.isArray(items)) return items.some(i => i.isNumberedListItem);
+        return !!items.isNumberedListItem;
+      }
+      // Group consecutive list items
+      function groupListBlocks(blocks) {
+        const result = [];
+        let currentList = null;
+        let currentType = null;
+        blocks.forEach(b => {
+          const items = flattenBlockData(b.blockData);
+          if (isBulletListBlock(items)) {
+            if (currentType !== 'ul') {
+              if (currentList) result.push(currentList);
+              currentList = { type: 'ul', items: [] };
+              currentType = 'ul';
+            }
+            currentList.items.push(items);
+          } else if (isOrderedListBlock(items)) {
+            if (currentType !== 'ol') {
+              if (currentList) result.push(currentList);
+              currentList = { type: 'ol', items: [] };
+              currentType = 'ol';
+            }
+            currentList.items.push(items);
+          } else {
+            if (currentList) {
+              result.push(currentList);
+              currentList = null;
+              currentType = null;
+            }
+            result.push(b);
+          }
+        });
+        if (currentList) result.push(currentList);
+        return result;
+      }
+      // Main render
+      const grouped = groupListBlocks(blocks);
+      return grouped.map(b => {
+        if (b.type === 'ul' || b.type === 'ol') {
+          const Tag = b.type;
+          return html`<${Tag}>${b.items.map(items => html`<li>${items.map(renderBlockItem)}</li>`)}</${Tag}>`;
+        } else {
+          // Not a grouped list, render as normal
+          let blockData = b.blockData;
+          let items = flattenBlockData(blockData);
+          if (isHeadingBlock(items)) {
+            // Render as heading (default h3)
+            return html`<h3>${Array.isArray(items) ? items.map(renderBlockItem) : renderBlockItem(items)}</h3>`;
+          }
+          // If only one item and it's a block type (image, pdf, youtube, weblink), render as block
+          if (items.length === 1) {
+            const item = items[0];
+            if (["image","pdf","youtube","weblink"].includes(item.type) || item.imageSrc || item.pdfFileKey || item.youtubeSrc || item.url) {
+              return renderBlockItem(item);
+            }
+          }
+          // Otherwise, render as paragraph
+          return html`<div>${items.map(renderBlockItem)}</div>`;
+        }
+      });
+    }
+    function renderTextNodeContent(node) {
+      if (!node) return null;
+      // Try Tiptap JSON
+      if (node.content) {
+        try {
+          const doc = JSON.parse(node.content);
+          if (doc && typeof doc === 'object' && doc.type) {
+            const rendered = renderTiptap(doc);
+            if (rendered) return rendered;
+          }
+        } catch {}
+      }
+      // Legacy blocks
+      if (node.childBlocks && node.childBlocks.length > 0) {
+        const rendered = renderLegacyBlocks(node.childBlocks);
+        if (rendered) return rendered;
+      }
+      // Fallback: pre
+      if (node.content) {
+        return html`<pre>${node.content}</pre>`;
+      }
+      // Empty state
+      return html`<div class="empty-note-helper">This note is empty</div>`;
+    }
+    function Sidebar({node,onClose}){
+      if(!node) return null;
+      return html`<div class="sidebar-overlay" onClick=${onClose}>
+        <div class="sidebar" onClick=${e=>e.stopPropagation()}>
+          <button class="close-btn" aria-label="Close" onClick=${onClose}>✕</button>
+          <h2>${node.title}</h2>
+          ${node.type === 'Text' ? renderTextNodeContent(node) : html`<p>${node.content||'No content yet.'}</p>`}
+        </div>
+      </div>`;
+    }
+    function App(){
+      const space=JSON.parse(document.getElementById('space-data').textContent);
+      const ext = space.nodes.reduce(
+        (acc, n) => {
+          const w = n.width ?? 200;
+          const h = n.height ?? 150;
+          acc.minX = Math.min(acc.minX, n.xCoord);
+          acc.minY = Math.min(acc.minY, n.yCoord);
+          acc.maxX = Math.max(acc.maxX, n.xCoord + w);
+          acc.maxY = Math.max(acc.maxY, n.yCoord + h);
+          return acc;
+        },
+        { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity },
+      );
+      const baseW = Math.max(ext.maxX + 100, 800);
+      const baseH = Math.max(ext.maxY + 100, 600);
+      const wrapperRef = useRef(null);
+      // Start with scale 1 and offset 0, will update after mount
+      const {scale, offset, onPointerDown, onPointerMove, onPointerUp, onWheel, setPanZoom}=usePanZoom(wrapperRef, 1, {x:0, y:0});
+      const [sidebarNode, setSidebarNode]=useState(null);
+      const [showInfo, setShowInfo]=useState(false);
+
+      // Center and fit content on initial mount
+      useLayoutEffect(() => {
+        if (!wrapperRef.current || !isFinite(ext.minX) || !isFinite(ext.minY)) return;
+        const rect = wrapperRef.current.getBoundingClientRect();
+        const contentW = ext.maxX - ext.minX;
+        const contentH = ext.maxY - ext.minY;
+        // Add margin (25%)
+        const margin = 0.25;
+        const fitW = rect.width * (1 - margin);
+        const fitH = rect.height * (1 - margin);
+        const scaleX = fitW / contentW;
+        const scaleY = fitH / contentH;
+        let newScale = Math.min(scaleX, scaleY, MAX_ZOOM);
+        newScale = clamp(newScale, MIN_ZOOM, MAX_ZOOM);
+        // Center the content
+        const offsetX = (rect.width - contentW * newScale) / 2 - ext.minX * newScale;
+        const offsetY = (rect.height - contentH * newScale) / 2 - ext.minY * newScale;
+        setPanZoom(newScale, { x: offsetX, y: offsetY });
+      }, [wrapperRef.current, ext.minX, ext.minY, ext.maxX, ext.maxY]);
+
+      const spaceTitle = space.title || 'Space';
+      document.title = spaceTitle;
+
+      return html`
+        <!-- UI -->
+        <div class="ui-layer">
+          <div class="ui-logo-box">
+            <img src="${ASSETS_PATH}logo.png" class="ui-logo" alt="Logo" />
+          </div>
+          <div class="ui-info-card">
+            <div class="ui-info-header">
+              <span class="ui-username">${space.owner?.username || 'user'}</span>
+            </div>
+            <div class="ui-space-title">${spaceTitle}</div>
+            <div class="ui-space-desc">${space.description}</div>
+          </div>
+        </div>
+        <!-- Canvas -->
+        <div class="canvas-wrapper" ref=${wrapperRef} onPointerDown=${onPointerDown} onPointerMove=${onPointerMove} onPointerUp=${onPointerUp} onWheel=${onWheel}>
+          <div class="canvas-content" style=${`--tx:${offset.x}px;--ty:${offset.y}px;--scale:${scale};width:${baseW}px;height:${baseH}px;`}>
+            ${space.nodes.map(n=>html`<${Node} key=${n.id} node=${n} openSide=${setSidebarNode} />`)}
+            ${Connections({nodes:space.nodes})}
+          </div>
+        </div>
+        <!-- Sidebar -->
+        ${Sidebar({node:sidebarNode,onClose:()=>setSidebarNode(null)})}
+      `;
+    }
+    render(html`<${App}/>`,document.getElementById('app'));
+  </script>
+</body>
+</html> 
